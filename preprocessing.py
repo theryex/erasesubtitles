@@ -6,23 +6,34 @@ import moviepy.editor as mp
 
 
 # To generate image frames and audio from the video
-def gen_image_frames(name, ip_path, a_path):
- 
-    if not os.path.exists(a_path):
-        os.makedirs(a_path)
+def gen_image_frames(video_path, audio_path):
+    """
+    Generates image frames and extracts audio from a video file.
 
-    vidcap = cv2.VideoCapture(ip_path + name)
+    Args:
+        video_path (str): The path to the video file.
+        audio_path (str): The path to save the extracted audio.
+
+    Returns:
+        list: A list of image frames from the video.
+    """
+    audio_dir = os.path.dirname(audio_path)
+    if not os.path.exists(audio_dir):
+        os.makedirs(audio_dir)
+
+    vidcap = cv2.VideoCapture(video_path)
 
     imgs = []
-    count = 0
-    success,image = vidcap.read()
+    success, image = vidcap.read()
     while success:
         imgs.append(image)
-        success,image = vidcap.read()
-        count += 1
+        success, image = vidcap.read()
 
-    my_clip = mp.VideoFileClip(ip_path + name)
-    my_clip.audio.write_audiofile(a_path + name[:-4] + '.mp3')
+    try:
+        my_clip = mp.VideoFileClip(video_path)
+        my_clip.audio.write_audiofile(audio_path)
+    except Exception as e:
+        print(f"Could not extract audio: {e}")
 
     return imgs
 

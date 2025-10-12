@@ -69,25 +69,25 @@ def read_frame_from_videos(video_path):
     return frames
 
 
-def set_up_model():
+def set_up_model(ckpt_path='E2FGVI/release_model/E2FGVI-CVPR22.pth'):
+    """
+    Sets up the inpainting model.
+
+    Args:
+        ckpt_path (str): The path to the model checkpoint.
+
+    Returns:
+        tuple: A tuple containing the model and the device.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = importlib.import_module('E2FGVI.model.e2fgvi')
     model = net.InpaintGenerator().to(device)
-    ckpt_path = 'E2FGVI/release_model/E2FGVI-CVPR22.pth'
     data = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(data)
     print(f'Loading model from: {ckpt_path}')
     model.eval()
     print('Model setup completed')
-
     return model, device
-
-
-def get_images_and_masks(video_path, mask_path):
-    print(f'Loading videos and masks from: {video_path}')
-    frames = read_frame_from_videos(video_path)
-    masks = read_mask(mask_path)
-    return frames, masks
 
 
 def gen_frames_and_masks(final_images, final_masks):
@@ -162,17 +162,26 @@ def inpaint(frames, binary_masks, imgs, masks, video_length, model):
 
 
 def inpaint_main(frames, masks):
+    """
+    Main function for inpainting.
+
+    Args:
+        frames (list): A list of frames to be inpainted.
+        masks (list): A list of masks corresponding to the frames.
+
+    Returns:
+        list: A list of inpainted frames.
+    """
     num_of_splits = len(frames)
-    num_of_frames = len(frames[0])
-    comp_frames = [None for i in range(num_of_splits)]
+    comp_frames = [None for _ in range(num_of_splits)]
 
     model, device = set_up_model()
     
     for i in range(num_of_splits):
-
-      f, binary_masks, imgs, m = preprocess_images_and_masks(frames[i], masks[i], device)
-      comp_frames[i] = inpaint(f, binary_masks, imgs, m, num_of_frames, model)
-      print('Completed Inpainting', i)
+        num_of_frames = len(frames[i])
+        f, binary_masks, imgs, m = preprocess_images_and_masks(frames[i], masks[i], device)
+        comp_frames[i] = inpaint(f, binary_masks, imgs, m, num_of_frames, model)
+        print(f'Completed Inpainting {i}')
 
     return comp_frames
 
