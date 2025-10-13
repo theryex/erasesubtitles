@@ -42,7 +42,7 @@ def gen_anchor( featuresize, scale,
 # anchor bbox iou
 # iou = inter_area/(bb_area + anchor_area - inter_area)
 def compute_iou(anchors, bbox):
-    ious = np.zeros((len(anchors), len(bbox)), dtype=np.float32)
+    ious = np.zeros((len(anchors), len(bbox)), dtype=32)
     anchor_area = (anchors[:,2] - anchors[:,0])*(anchors[:,3] - anchors[:,1])
     for num, _bbox in enumerate(bbox):
         bb = np.tile(_bbox,(len(anchors), 1))
@@ -313,7 +313,7 @@ class TextProposalConnectorOriented:
     def get_text_lines(self, text_proposals, scores, im_size):
         tp_groups = self.group_text_proposals(text_proposals, scores, im_size) 
         
-        text_lines = np.zeros((len(tp_groups), 8), np.float32)
+        text_lines = np.zeros((len(tp_groups), 8), 32)
         for index, tp_indices in enumerate(tp_groups):
             text_line_boxes = text_proposals[list(tp_indices)]
 
@@ -341,7 +341,7 @@ class TextProposalConnectorOriented:
             height = np.mean((text_line_boxes[:, 3] - text_line_boxes[:, 1]))
             text_lines[index, 7] = height + 2.5
 
-        text_recs = np.zeros((len(text_lines), 9), np.float)
+        text_recs = np.zeros((len(text_lines), 9), np.float64)
         index = 0
         for line in text_lines:
             b1 = line[6] - line[7] / 2 
