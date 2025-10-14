@@ -35,7 +35,8 @@ def get_coords(num_of_frames, masks):
         input_img = cv2.resize(masks[i], (rw, rh))
         text_boxes = get_text_boxes(input_img)
 
-        if not text_boxes:
+        # Check if the numpy array is empty
+        if text_boxes.size == 0:
             continue
 
         for box in text_boxes:

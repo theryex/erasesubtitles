@@ -4,77 +4,47 @@ import cv2
 import numpy as np
 import moviepy.editor as mp
 
-def extract_audio(video_path, audio_path):
-    """Extracts audio from a video file."""
-    if os.path.exists(audio_path):
-        print("Audio file already exists. Skipping extraction.")
-        return
 
-    try:
-        print(f"Extracting audio to {audio_path}")
-        video_clip = mp.VideoFileClip(video_path)
-        audio_clip = video_clip.audio
-        if audio_clip:
-            audio_clip.write_audiofile(audio_path, codec='mp3')
-            audio_clip.close()
-        video_clip.close()
-    except Exception as e:
-        print(f"Could not extract audio: {e}")
-
-def gen_image_frames(video_path, start_frame, end_frame):
+# To generate image frames and audio from the video
+def gen_image_frames(video_path, audio_path):
     """
-    Generates image frames from a specific segment of a video file.
+    Generates image frames and extracts audio from a video file.
 
     Args:
         video_path (str): The path to the video file.
-        start_frame (int): The starting frame number.
-        end_frame (int): The ending frame number.
+        audio_path (str): The path to save the extracted audio.
 
     Returns:
-        list: A list of image frames from the specified video segment.
+        list: A list of image frames from the video.
     """
+    audio_dir = os.path.dirname(audio_path)
+    if not os.path.exists(audio_dir):
+        os.makedirs(audio_dir)
+
     vidcap = cv2.VideoCapture(video_path)
-    if not vidcap.isOpened():
-        print("Error: Could not open video.")
-        return []
 
     imgs = []
-    vidcap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-    current_frame = start_frame
-
-    while current_frame < end_frame:
-        success, image = vidcap.read()
-        if not success:
-            break
+    success, image = vidcap.read()
+    while success:
         imgs.append(image)
-        current_frame += 1
+        success, image = vidcap.read()
 
-    vidcap.release()
+    try:
+        my_clip = mp.VideoFileClip(video_path)
+        my_clip.audio.write_audiofile(audio_path)
+    except Exception as e:
+        print(f"Could not extract audio: {e}")
+
     return imgs
 
 
+# Color segmentation
 def seg(image):
-    """
-    Creates a binary mask of potential text regions using adaptive thresholding.
-    This method is more robust to different subtitle colors than simple color segmentation.
-    """
-    # Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # Apply adaptive thresholding
-    # This will turn parts of the image white where local contrast is high (like text)
-    # and black elsewhere.
-    mask = cv2.adaptiveThreshold(
-        gray, 255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY_INV,
-        11, # Block size
-        10  # Constant to subtract from the mean
-    )
-
-    # Convert single-channel mask back to 3-channel BGR for consistency
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower = np.array([0, 0, 200])
+    upper = np.array([150, 15, 255])
+    mask = cv2.inRange(hsv, lower, upper)
     mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-
     return mask
 
 def seg_imgs(images):
