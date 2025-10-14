@@ -1,12 +1,15 @@
 Multilingual Subtitle Text Detection and Removal using Video Inpainting
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1aizysXPAMtahOGcNjVhD2zHLE1TTWNfy?usp=sharing)
+The below pretrained weights are required to function.
 
 Download [Text Detection checkpoints](https://drive.google.com/drive/folders/1ZeimKwzWYDWxHOV6-ES78T5W_kJJAEvP?usp=sharing) and [E2FGVI checkpoints](https://drive.google.com/drive/folders/1duoBn3eHIDpW4hnMmpkZYN4cKtgpLwbU?usp=sharing).
 
 Add the respective pretrained weights to:
 - weights to text_detection dir
+- ./text_detection/weights/new_ctpn_ep09_0.0420_0.0198_0.0618.pth
 - release_model to E2FGVI dir
+- ./E2FGVI/release_model/E2FGVI-CVPR22.pth
+- ./E2FGVI/release_model/E2FGVI-HQ-CVPR22.pth
 
 
 
