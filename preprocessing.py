@@ -53,13 +53,28 @@ def gen_image_frames(video_path, start_frame, end_frame):
     return imgs
 
 
-# Color segmentation
 def seg(image):
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower = np.array([0, 0, 200])
-    upper = np.array([150, 15, 255])
-    mask = cv2.inRange(hsv, lower, upper)
+    """
+    Creates a binary mask of potential text regions using adaptive thresholding.
+    This method is more robust to different subtitle colors than simple color segmentation.
+    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Apply adaptive thresholding
+    # This will turn parts of the image white where local contrast is high (like text)
+    # and black elsewhere.
+    mask = cv2.adaptiveThreshold(
+        gray, 255,
+        cv2.ADAPTIVE_THRESH_MEAN_C,
+        cv2.THRESH_BINARY_INV,
+        11, # Block size
+        10  # Constant to subtract from the mean
+    )
+
+    # Convert single-channel mask back to 3-channel BGR for consistency
     mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
     return mask
 
 def seg_imgs(images):

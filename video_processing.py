@@ -2,6 +2,7 @@ import os
 import cv2
 from moviepy.editor import VideoFileClip, AudioFileClip
 import math
+import numpy as np
 
 from preprocessing import gen_image_frames, seg_imgs, extract_audio
 from detectText import get_coords
@@ -63,16 +64,28 @@ def erase_subtitles(video_path):
     print("\nExtracting audio...")
     extract_audio(video_path, audio_path)
 
-    # Prepare for subtitle detection
-    print("\nDetecting subtitle regions...")
+    # Prepare for subtitle detection by sampling frames across the video
+    print("\nDetecting subtitle regions by sampling frames...")
     cap = cv2.VideoCapture(video_path)
     sample_frames = []
-    for i in range(min(total_frames, 300)):  # Sample first 300 frames
+    sample_count = 300
+
+    if total_frames > sample_count:
+        # Sample ~300 frames evenly distributed throughout the video
+        frame_indices = np.linspace(0, total_frames - 1, sample_count, dtype=int)
+    else:
+        # If the video is shorter than 300 frames, sample all frames
+        frame_indices = np.arange(total_frames)
+
+    for idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
-        if not ret:
-            break
-        sample_frames.append(frame)
+        if ret:
+            sample_frames.append(frame)
     cap.release()
+
+    if not sample_frames:
+        return None, "Could not sample frames from the video."
 
     masks = seg_imgs(sample_frames)
     coords = get_coords(len(masks), masks)
