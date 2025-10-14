@@ -22,12 +22,34 @@ def get_video_details(video_path):
     cap.release()
     return total_frames, fps, (width, height)
 
-def erase_subtitles(video_name):
+def convert_to_mp4(video_path):
+    """Converts a video to MP4 format if it's not already."""
+    name, ext = os.path.splitext(video_path)
+    if ext.lower() == '.mp4':
+        return video_path, False  # No conversion needed
+
+    output_path = f"{name}.mp4"
+    print(f"Converting {video_path} to {output_path}...")
+    try:
+        video_clip = VideoFileClip(video_path)
+        video_clip.write_videofile(output_path, codec='libx264', audio_codec='aac')
+        return output_path, True
+    except Exception as e:
+        print(f"Error converting video: {e}")
+        return None, False
+
+def erase_subtitles(video_path):
     """
     Processes a video to remove subtitles in chunks to handle large files.
     """
     print('Starting...')
-    video_path = os.path.join('Input/Video', video_name)
+
+    converted_path, was_converted = convert_to_mp4(video_path)
+    if not converted_path:
+        return None, "Video conversion failed."
+
+    video_path = converted_path
+    video_name = os.path.basename(video_path)
     audio_path = os.path.join('Input/Audio', f"{os.path.splitext(video_name)[0]}.mp3")
 
     # Get video properties
@@ -63,7 +85,7 @@ def erase_subtitles(video_name):
     # Prepare video writer
     os.makedirs('Output/Inpainted', exist_ok=True)
     inpainted_video_path = os.path.join('Output/Inpainted', video_name)
-    out = cv2.VideoWriter(inpainted_video_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, size)
+    out = cv2.VideoWriter(inpainted_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
 
     print("\nStarting chunk-based inpainting...")
     for start_frame in range(0, total_frames, CHUNK_SIZE):
@@ -100,6 +122,10 @@ def erase_subtitles(video_name):
 
     output_video_path = os.path.join('Output', video_name)
     final_clip.write_videofile(output_video_path, codec='libx264', audio_codec='aac')
+
+    if was_converted:
+        print(f"Cleaning up temporary file: {converted_path}")
+        os.remove(converted_path)
 
     print('\nCompleted :)')
     return output_video_path, "Subtitles removed successfully!"
