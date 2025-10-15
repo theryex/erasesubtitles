@@ -35,13 +35,18 @@ def get_coords(num_of_frames, masks, gpu_id=0):
         input_img = cv2.resize(masks[i], (rw, rh))
         text_boxes = get_text_boxes(input_img, gpu_id=gpu_id)
 
-        # Check if the numpy array is empty
-        if text_boxes.size == 0:
+        # Check if the text_boxes are empty (can be a list or numpy array)
+        if isinstance(text_boxes, np.ndarray) and text_boxes.size == 0:
+            continue
+        if isinstance(text_boxes, list) and not text_boxes:
             continue
 
         for box in text_boxes:
             # Scale coordinates back to original image dimensions
             box = np.array(box) * rescale_fac
+
+            # Reshape the flat array into a 2D array of (x, y) pairs
+            box = box.reshape(-1, 2)
 
             # Get bounding box for the current text detection
             xmin, ymin = np.min(box, axis=0)
