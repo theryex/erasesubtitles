@@ -11,7 +11,7 @@ def resize_img(image, max_dim=1000):
         w = int(w / rescale_fac)
     return h, w, rescale_fac
 
-def get_coords(num_of_frames, masks):
+def get_coords(num_of_frames, masks, gpu_id=0):
     """
     Detects the subtitle region by aggregating text boxes from sample frames.
     Includes robust validation and coordinate scaling.
@@ -33,7 +33,7 @@ def get_coords(num_of_frames, masks):
 
     for i in range(num_of_frames):
         input_img = cv2.resize(masks[i], (rw, rh))
-        text_boxes = get_text_boxes(input_img)
+        text_boxes = get_text_boxes(input_img, gpu_id=gpu_id)
 
         # Check if the numpy array is empty
         if text_boxes.size == 0:
