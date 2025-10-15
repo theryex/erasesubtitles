@@ -39,7 +39,7 @@ def convert_to_mp4(video_path):
         print(f"Error converting video: {e}")
         return None, False
 
-def erase_subtitles(video_path, gpu_id=0):
+def erase_subtitles(video_path, gpu_id=0, sample_size=600, force=None):
     """
     Processes a video to remove subtitles in chunks to handle large files.
     """
@@ -64,32 +64,44 @@ def erase_subtitles(video_path, gpu_id=0):
     print("\nExtracting audio...")
     extract_audio(video_path, audio_path)
 
-    # Prepare for subtitle detection by sampling frames across the video
-    print("\nDetecting subtitle regions by sampling frames...")
-    cap = cv2.VideoCapture(video_path)
-    sample_frames = []
-    sample_count = 300
+    coords = None
+    if force:
+        height, width = size[1], size[0]
+        if force == 'lower':
+            print("Forcing subtitle removal on lower third of the video.")
+            # Define coords for the bottom third of the video
+            coords = [0, height * 2 // 3, width, height]
+        elif force == 'upper':
+            print("Forcing subtitle removal on upper third of the video.")
+            # Define coords for the top third of the video
+            coords = [0, 0, width, height // 3]
 
-    if total_frames > sample_count:
-        # Sample ~300 frames evenly distributed throughout the video
-        frame_indices = np.linspace(0, total_frames - 1, sample_count, dtype=int)
-    else:
-        # If the video is shorter than 300 frames, sample all frames
-        frame_indices = np.arange(total_frames)
+    if not coords:
+        # Prepare for subtitle detection by sampling frames across the video
+        print("\nDetecting subtitle regions by sampling frames...")
+        cap = cv2.VideoCapture(video_path)
+        sample_frames = []
 
-    for idx in frame_indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = cap.read()
-        if ret:
-            sample_frames.append(frame)
-    cap.release()
+        if total_frames > sample_size:
+            # Sample frames evenly distributed throughout the video
+            frame_indices = np.linspace(0, total_frames - 1, sample_size, dtype=int)
+        else:
+            # If the video is shorter than sample_size, sample all frames
+            frame_indices = np.arange(total_frames)
 
-    if not sample_frames:
-        return None, "Could not sample frames from the video."
+        for idx in frame_indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if ret:
+                sample_frames.append(frame)
+        cap.release()
 
-    masks = seg_imgs(sample_frames)
-    coords = get_coords(len(masks), masks, gpu_id=gpu_id)
-    print('Subtitle Region coords:', coords)
+        if not sample_frames:
+            return None, "Could not sample frames from the video."
+
+        masks = seg_imgs(sample_frames)
+        coords = get_coords(len(masks), masks, gpu_id=gpu_id)
+        print('Subtitle Region coords:', coords)
 
     if not coords:
         print('No subtitles found in the input video!!!')
