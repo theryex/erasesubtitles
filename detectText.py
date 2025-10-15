@@ -45,6 +45,11 @@ def get_coords(num_of_frames, masks, gpu_id=0):
             # Scale coordinates back to original image dimensions
             box = np.array(box) * rescale_fac
 
+            # Validate that the coordinate array has an even number of elements
+            if box.size % 2 != 0:
+                print(f"Skipping malformed bounding box (odd number of coordinates): {box}")
+                continue
+
             # Reshape the flat array into a 2D array of (x, y) pairs
             box = box.reshape(-1, 2)
 
