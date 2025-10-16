@@ -19,19 +19,6 @@ def main_cli():
         default=0,
         help="The ID of the GPU to use for processing (e.g., 0, 1)."
     )
-    parser.add_argument(
-        "--sample_size",
-        type=int,
-        default=600,
-        help="The number of frames to sample for subtitle detection."
-    )
-    parser.add_argument(
-        "--force",
-        type=str,
-        choices=['upper', 'lower'],
-        default=None,
-        help="Force subtitle removal on the 'upper' or 'lower' third of the video, skipping detection."
-    )
     args = parser.parse_args()
 
     print("Ensuring required directories exist...")
@@ -57,12 +44,7 @@ def main_cli():
     print(f"\nStarting subtitle removal for '{video_filename}'...")
     start_time = time.time()
 
-    output_video_path, message = erase_subtitles(
-        input_video_path,
-        gpu_id=args.gpu_id,
-        sample_size=args.sample_size,
-        force=args.force
-    )
+    output_video_path, message = erase_subtitles(input_video_path, gpu_id=args.gpu_id)
 
     end_time = time.time()
     duration = end_time - start_time

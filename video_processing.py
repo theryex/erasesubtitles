@@ -3,6 +3,7 @@ import cv2
 from moviepy.editor import VideoFileClip, AudioFileClip
 import math
 import numpy as np
+from tqdm import tqdm
 
 from preprocessing import gen_image_frames, seg_imgs, extract_audio
 from detectText import get_coords
@@ -39,9 +40,34 @@ def convert_to_mp4(video_path):
         print(f"Error converting video: {e}")
         return None, False
 
-def erase_subtitles(video_path, gpu_id=0, sample_size=600, force=None):
+def detect_all_subtitle_regions(video_path, total_frames, gpu_id=0):
     """
-    Processes a video to remove subtitles in chunks to handle large files.
+    Pass 1: Detect all subtitle regions throughout the entire video.
+    Returns a dictionary mapping frame numbers to subtitle coordinates.
+    """
+    print("\nPass 1: Detecting all subtitle regions...")
+    cap = cv2.VideoCapture(video_path)
+    subtitle_map = {}
+
+    for frame_num in tqdm(range(total_frames), desc="Detecting subtitles"):
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Use a simplified mask generation for speed
+        mask = seg_imgs([frame])
+        coords = get_coords(1, mask, gpu_id=gpu_id)
+
+        if coords:
+            subtitle_map[frame_num] = coords
+
+    cap.release()
+    print(f"Found subtitles in {len(subtitle_map)} frames.")
+    return subtitle_map
+
+def erase_subtitles(video_path, gpu_id=0):
+    """
+    Processes a video to remove subtitles using a two-pass system.
     """
     print('Starting...')
 
@@ -53,89 +79,51 @@ def erase_subtitles(video_path, gpu_id=0, sample_size=600, force=None):
     video_name = os.path.basename(video_path)
     audio_path = os.path.join('Input/Audio', f"{os.path.splitext(video_name)[0]}.mp3")
 
-    # Get video properties
     total_frames, fps, size = get_video_details(video_path)
     if total_frames == 0:
         return None, "Could not open video file."
 
     print(f"Video stats: {total_frames} frames, {fps:.2f} FPS, {size[0]}x{size[1]} resolution.")
 
-    # Extract audio once
-    print("\nExtracting audio...")
     extract_audio(video_path, audio_path)
 
-    coords = None
-    if force:
-        height, width = size[1], size[0]
-        if force == 'lower':
-            print("Forcing subtitle removal on lower third of the video.")
-            # Define coords for the bottom third of the video
-            coords = [0, height * 2 // 3, width, height]
-        elif force == 'upper':
-            print("Forcing subtitle removal on upper third of the video.")
-            # Define coords for the top third of the video
-            coords = [0, 0, width, height // 3]
+    subtitle_map = detect_all_subtitle_regions(video_path, total_frames, gpu_id)
 
-    if not coords:
-        # Prepare for subtitle detection by sampling frames across the video
-        print("\nDetecting subtitle regions by sampling frames...")
-        cap = cv2.VideoCapture(video_path)
-        sample_frames = []
-
-        if total_frames > sample_size:
-            # Sample frames evenly distributed throughout the video
-            frame_indices = np.linspace(0, total_frames - 1, sample_size, dtype=int)
-        else:
-            # If the video is shorter than sample_size, sample all frames
-            frame_indices = np.arange(total_frames)
-
-        for idx in frame_indices:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-            ret, frame = cap.read()
-            if ret:
-                sample_frames.append(frame)
-        cap.release()
-
-        if not sample_frames:
-            return None, "Could not sample frames from the video."
-
-        masks = seg_imgs(sample_frames)
-        coords = get_coords(len(masks), masks, gpu_id=gpu_id)
-        print('Subtitle Region coords:', coords)
-
-    if not coords:
+    if not subtitle_map:
         print('No subtitles found in the input video!!!')
         return None, "No subtitles were detected in the video."
 
-    # Prepare video writer
     os.makedirs('Output/Inpainted', exist_ok=True)
     inpainted_video_path = os.path.join('Output/Inpainted', video_name)
     out = cv2.VideoWriter(inpainted_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
 
-    print("\nStarting chunk-based inpainting...")
-    for start_frame in range(0, total_frames, CHUNK_SIZE):
-        end_frame = min(start_frame + CHUNK_SIZE, total_frames)
-        print(f"Processing frames from {start_frame} to {end_frame-1}...")
+    print("\nPass 2: Inpainting subtitle regions...")
+    cap = cv2.VideoCapture(video_path)
 
-        # Generate frames for the current chunk
-        images = gen_image_frames(video_path, start_frame, end_frame)
-        if not images:
-            continue
+    for frame_num in tqdm(range(total_frames), desc="Inpainting frames"):
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-        masks = seg_imgs(images)
+        if frame_num in subtitle_map:
+            coords = subtitle_map[frame_num]
+            images = [frame]
+            masks = seg_imgs(images)
 
-        h, w = 240, 432
-        new_coords, num_of_splits, final_images, final_masks = gen_regions(h, w, images, masks, coords)
+            h, w = 240, 432
+            new_coords, num_of_splits, final_images, final_masks = gen_regions(h, w, images, masks, coords)
 
-        iframes, imasks = gen_frames_and_masks(final_images, final_masks)
-        comp_frames = inpaint_main(iframes, imasks, gpu_id=gpu_id)
-        inpainted_frames = merge(len(images), num_of_splits, new_coords, comp_frames, images)
-
-        for frame in inpainted_frames:
+            iframes, imasks = gen_frames_and_masks(final_images, final_masks)
+            comp_frames = inpaint_main(iframes, imasks, gpu_id=gpu_id)
+            inpainted_frame = merge(len(images), num_of_splits, new_coords, comp_frames, images)[0]
+            out.write(inpainted_frame)
+        else:
+            # If no subtitles, just write the original frame
             out.write(frame)
 
+    cap.release()
     out.release()
-    print("Chunk-based inpainting complete.")
+    print("Inpainting complete.")
 
     print('\nAdding Audio...')
     video_clip = VideoFileClip(inpainted_video_path)
@@ -143,7 +131,7 @@ def erase_subtitles(video_path, gpu_id=0, sample_size=600, force=None):
         audio_clip = AudioFileClip(audio_path)
         final_clip = video_clip.set_audio(audio_clip)
     else:
-        final_clip = video_clip  # No audio to attach
+        final_clip = video_clip
 
     output_video_path = os.path.join('Output', video_name)
     final_clip.write_videofile(output_video_path, codec='libx264', audio_codec='aac')
