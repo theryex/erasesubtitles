@@ -54,14 +54,26 @@ def gen_image_frames(video_path, start_frame=None, end_frame=None):
     return imgs
 
 
-# Color segmentation
 def seg(image):
+    """
+    Creates a binary mask of potential text regions using color segmentation
+    followed by morphological closing to handle outlined text.
+    """
+    # Isolate white-like pixels
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     lower = np.array([0, 0, 200])
-    upper = np.array([150, 15, 255])
+    upper = np.array([180, 55, 255]) # Loosened the constraints slightly
     mask = cv2.inRange(hsv, lower, upper)
-    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-    return mask
+
+    # Use morphological closing to fill gaps in the text
+    # This helps connect letters that have black outlines
+    kernel = np.ones((10,10),np.uint8)
+    closed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    # Convert single-channel mask back to 3-channel BGR for consistency
+    final_mask = cv2.cvtColor(closed_mask, cv2.COLOR_GRAY2BGR)
+
+    return final_mask
 
 def seg_imgs(images):
     masks = [None for i in range(len(images))]
