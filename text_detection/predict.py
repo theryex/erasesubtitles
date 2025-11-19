@@ -9,22 +9,37 @@ from text_detection.ctpn.ctpn import CTPN_Model
 from text_detection.ctpn.utils import gen_anchor, transform_bbox, clip_bbox, filter_bbox, nms, TextProposalConnectorOriented
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-weights = 'text_detection/weights/new_ctpn_ep09_0.0420_0.0198_0.0618.pth'
-model = CTPN_Model().to(device)
-model.load_state_dict(torch.load(weights, map_location=device)['model_state_dict'])
-model.eval()
+# Global cache for the model to avoid reloading
+model_cache = {}
 
+def get_model(gpu_id=0):
+    """Loads the model onto the specified GPU, caching it for future use."""
+    device_name = f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu"
 
+    if device_name in model_cache:
+        return model_cache[device_name]
 
-def get_text_boxes(image, display = False, prob_thresh = 0.5):
-    h, w= image.shape[:2]
+    device = torch.device(device_name)
+    weights = 'text_detection/weights/new_ctpn_ep09_0.0420_0.0198_0.0618.pth'
+    model = CTPN_Model().to(device)
+    model.load_state_dict(torch.load(weights, map_location=device)['model_state_dict'])
+    model.eval()
+
+    model_cache[device_name] = (model, device)
+    return model, device
+
+def get_text_boxes(image, gpu_id=0, display=False, prob_thresh=0.5):
+    """Detects text boxes in an image using the CTPN model on a specified GPU."""
+    model, device = get_model(gpu_id)
+
+    h, w = image.shape[:2]
     rescale_fac = max(h, w) / 1000
     if rescale_fac > 1.0:
         h = int(h / rescale_fac)
         w = int(w / rescale_fac)
-        image = cv2.resize(image, (w,h))
+        image = cv2.resize(image, (w, h))
         h, w = image.shape[:2]
+
     image = image.astype(np.float32) - config.IMAGE_MEAN
     image = torch.from_numpy(image.transpose(2, 0, 1)).unsqueeze(0).float().to(device)
 

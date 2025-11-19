@@ -69,17 +69,18 @@ def read_frame_from_videos(video_path):
     return frames
 
 
-def set_up_model(ckpt_path='E2FGVI/release_model/E2FGVI-CVPR22.pth'):
+def set_up_model(gpu_id=0, ckpt_path='E2FGVI/release_model/E2FGVI-CVPR22.pth'):
     """
     Sets up the inpainting model.
 
     Args:
+        gpu_id (int): The ID of the GPU to use.
         ckpt_path (str): The path to the model checkpoint.
 
     Returns:
         tuple: A tuple containing the model and the device.
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
     net = importlib.import_module('E2FGVI.model.e2fgvi')
     model = net.InpaintGenerator().to(device)
     data = torch.load(ckpt_path, map_location=device)
@@ -161,13 +162,14 @@ def inpaint(frames, binary_masks, imgs, masks, video_length, model):
     return comp_frames
 
 
-def inpaint_main(frames, masks):
+def inpaint_main(frames, masks, gpu_id=0):
     """
     Main function for inpainting.
 
     Args:
         frames (list): A list of frames to be inpainted.
         masks (list): A list of masks corresponding to the frames.
+        gpu_id (int): The ID of the GPU to use.
 
     Returns:
         list: A list of inpainted frames.
@@ -175,7 +177,7 @@ def inpaint_main(frames, masks):
     num_of_splits = len(frames)
     comp_frames = [None for _ in range(num_of_splits)]
 
-    model, device = set_up_model()
+    model, device = set_up_model(gpu_id=gpu_id)
     
     for i in range(num_of_splits):
         num_of_frames = len(frames[i])

@@ -11,7 +11,13 @@ def main_cli():
         "--video",
         type=str,
         required=True,
-        help="The name of the video file (e.g., 'my_movie.mp4'). The file must be placed in the 'Input/Video/' directory."
+        help="The path to the video file (e.g., 'my_movie.mp4' or '/path/to/my_movie.mp4')."
+    )
+    parser.add_argument(
+        "--gpu_id",
+        type=int,
+        default=0,
+        help="The ID of the GPU to use for processing (e.g., 0, 1)."
     )
     args = parser.parse_args()
 
@@ -20,18 +26,25 @@ def main_cli():
     os.makedirs("Input/Audio", exist_ok=True)
     os.makedirs("Output", exist_ok=True)
 
-    video_filename = args.video
-    input_video_path = os.path.join("Input/Video", video_filename)
+    video_path = args.video
+
+    # If the path doesn't exist, assume it's in the Input/Video directory
+    if not os.path.exists(video_path):
+        input_video_path = os.path.join("Input/Video", video_path)
+    else:
+        input_video_path = video_path
 
     if not os.path.exists(input_video_path):
         print(f"\nERROR: Input file not found at '{input_video_path}'")
-        print("Please make sure your video is placed in the 'Input/Video' folder before running.")
+        print("Please make sure your video is placed in the 'Input/Video' folder or provide a full path.")
         return  # Exit the script
+
+    video_filename = os.path.basename(input_video_path)
 
     print(f"\nStarting subtitle removal for '{video_filename}'...")
     start_time = time.time()
 
-    output_video_path, message = erase_subtitles(video_filename)
+    output_video_path, message = erase_subtitles(input_video_path, gpu_id=args.gpu_id)
 
     end_time = time.time()
     duration = end_time - start_time
